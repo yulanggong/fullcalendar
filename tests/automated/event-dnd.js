@@ -4,7 +4,8 @@ describe('eventDrop', function() {
 	beforeEach(function() {
 		options = {
 			defaultDate: '2014-06-11',
-			editable: true
+			editable: true,
+			dragScroll: false
 		};
 		affix('#cal');
 	});
@@ -28,12 +29,10 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						$('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag-n-drop', {
-								dx: $('.fc-day').width() * 2,
-								dy: $('.fc-day').height()
-							});
+						$('.fc-event').simulate('drag-n-drop', {
+							dx: $('.fc-day').width() * 2,
+							dy: $('.fc-day').height()
+						});
 					},
 					function(event, delta, revertFunc) {
 						expect(delta.asDays()).toBe(9);
@@ -64,12 +63,10 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						$('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag-n-drop', {
-								dx: $('.fc-day').width() * -2,
-								dy: $('.fc-day').height()
-							});
+						$('.fc-event').simulate('drag-n-drop', {
+							dx: $('.fc-day').width() * -2,
+							dy: $('.fc-day').height()
+						});
 					},
 					function(event, delta, revertFunc) {
 						expect(delta.asDays()).toBe(5);
@@ -89,6 +86,53 @@ describe('eventDrop', function() {
 				);
 			});
 		});
+
+		// TODO: tests for eventMouseover/eventMouseout firing correctly when no dragging
+		it('should not fire any eventMouseover/eventMouseout events while dragging', function(done) { // issue 1297
+			options.events = [
+				{
+					title: 'all-day event',
+					start: '2014-06-11',
+					allDay: true,
+					className: 'event1'
+				},
+				{
+					title: 'event2',
+					start: '2014-06-10',
+					allDay: true,
+					className: 'event2'
+				}
+			];
+			options.eventMouseover = function() { };
+			options.eventMouseout = function() { };
+			spyOn(options, 'eventMouseover');
+			spyOn(options, 'eventMouseout');
+
+			init(
+				function() {
+					$('.event1').simulate('drag-n-drop', {
+						dx: $('.fc-day').width() * 2,
+						dy: $('.fc-day').height(),
+						interpolation: {
+							stepCount: 10,
+							duration: 1000
+						}
+					});
+					setTimeout(function() { // wait until half way through drag
+						$('.event2')
+							.simulate('mouseover')
+							.simulate('mouseenter')
+							.simulate('mouseout')
+							.simulate('mouseleave');
+					}, 500);
+				},
+				function(event, delta, revertFunc) {
+					expect(options.eventMouseover).not.toHaveBeenCalled();
+					expect(options.eventMouseout).not.toHaveBeenCalled();
+					done();
+				}
+			);
+		});
 	});
 
 	describe('when in agenda view', function() {
@@ -106,12 +150,10 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						$('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag-n-drop', {
-								dx: $('th.fc-wed').width(), // 1 day
-								dy: $('tr.fc-slot1').height() * 3 // 1.5 hours
-							});
+						$('.fc-event .fc-time').simulate('drag-n-drop', {
+							dx: $('th.fc-wed').width(), // 1 day
+							dy: $('.fc-slats tr:eq(1)').outerHeight() * 2.9 // 1.5 hours
+						});
 					},
 					function(event, delta, revertFunc) {
 						expect(delta.days()).toBe(1);
@@ -142,11 +184,9 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						$('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag-n-drop', {
-								dx: $('th.fc-wed').width() * 2 // 2 days
-							});
+						$('.fc-event').simulate('drag-n-drop', {
+							dx: $('th.fc-wed').width() * 2 // 2 days
+						});
 					},
 					function(event, delta, revertFunc) {
 						expect(delta.days()).toBe(2);
@@ -179,12 +219,12 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						$('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag-n-drop', {
-								dx: $('th.fc-wed').width() * -1,
-								dy: $('.fc-agenda-allday').outerHeight() + $('.fc-agenda-divider').outerHeight()
-							});
+						var allDayGrid = $('.fc-agenda-view .fc-day-grid');
+						var hr = allDayGrid.next('hr');
+						$('.fc-event').simulate('drag-n-drop', {
+							dx: $('th.fc-wed').width() * -1,
+							dy: allDayGrid.outerHeight() + hr.outerHeight()
+						});
 					},
 					function(event, delta, revertFunc) {
 						expect(delta.days()).toBe(-1);
@@ -221,28 +261,26 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						eventElm = $('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag', {
-								dx: $('th.fc-wed').width() * -1,
-								dy: -$('.fc-agenda-allday').outerHeight(),
-								callback: function() {
-									// the all day slot works off of mouse-moving coordinates
-									var offset = eventElm.offset();
-									$('.fc-agenda-allday .fc-day-content')
-										.simulate('mouseover', {
-											clientX: offset.left + 10,
-											clientY: offset.top + 10
-										})
-										.simulate('mousemove', {
-											clientX: offset.left + 10,
-											clientY: offset.top + 10
-										});
-									setTimeout(function() {
-										eventElm.simulate('drop');
-									}, 100);
-								}
-							});
+						eventElm = $('.fc-event .fc-time').simulate('drag', { // grabs the top of the event
+							dx: $('th.fc-wed').width() * -1,
+							dy: -$('.fc-agenda-view .fc-day-grid').outerHeight(),
+							callback: function() {
+								// the all day slot works off of mouse-moving coordinates
+								var offset = eventElm.offset();
+								$('.fc-agenda-allday .fc-day-content')
+									.simulate('mouseover', {
+										clientX: offset.left + 10,
+										clientY: offset.top + 10
+									})
+									.simulate('mousemove', {
+										clientX: offset.left + 10,
+										clientY: offset.top + 10
+									});
+								setTimeout(function() {
+									eventElm.simulate('drop');
+								}, 100);
+							}
+						});
 					},
 					function(event, delta, revertFunc) {
 						expect(delta.days()).toBe(-1);
@@ -280,16 +318,14 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						eventElm = $('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag', {
-								dy: $('tr.fc-slot1').height() * 3, // 1.5 hours
-								callback: function() {
-									dragged = true;
-									expect(eventElm.find('.fc-event-time')).toHaveText('2:30');
-									eventElm.simulate('drop');
-								}
-							});
+						eventElm = $('.fc-event .fc-time').simulate('drag', {
+							dy: $('.fc-slats tr:eq(1)').height() * 2.9, // 1.5 hours
+							callback: function() {
+								dragged = true;
+								expect($('.fc-event.fc-helper .fc-time')).toHaveText('2:30');
+								eventElm.simulate('drop');
+							}
+						});
 					},
 					function() {
 						expect(dragged).toBe(true);
@@ -315,16 +351,14 @@ describe('eventDrop', function() {
 
 				init(
 					function() {
-						eventElm = $('.fc-event')
-							.simulate('mouseover') // for our dumb optimization
-							.simulate('drag', {
-								dy: $('tr.fc-slot1').height() * 3, // 1.5 hours
-								callback: function() {
-									dragged = true;
-									expect(eventElm.find('.fc-event-time')).toHaveText('2:30 - 3:30');
-									eventElm.simulate('drop');
-								}
-							});
+						eventElm = $('.fc-event .fc-time').simulate('drag', {
+							dy: $('.fc-slats tr:eq(1)').height() * 2.9, // 1.5 hours
+							callback: function() {
+								dragged = true;
+								expect($('.fc-event.fc-helper .fc-time')).toHaveText('2:30 - 3:30');
+								eventElm.simulate('drop');
+							}
+						});
 					},
 					function() {
 						expect(dragged).toBe(true);

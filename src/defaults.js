@@ -83,11 +83,20 @@ var defaults = {
 		prevYear: 'seek-prev',
 		nextYear: 'seek-next'
 	},
+
+	dragOpacity: .75,
+	dragRevertDuration: 500,
+	dragScroll: true,
 	
 	//selectable: false,
 	unselectAuto: true,
 	
 	dropAccept: '*',
+
+	eventLimit: false,
+	eventLimitText: 'more',
+	eventLimitClick: 'popover',
+	dayPopoverFormat: 'LL',
 	
 	handleWindowResize: true,
 	windowResizeDelay: 200 // milliseconds before a rerender happens
@@ -120,7 +129,8 @@ var langOptionHash = {
 	en: {
 		columnFormat: {
 			week: 'ddd M/D' // override for english. different from the generated default, which is MM/DD
-		}
+		},
+		dayPopoverFormat: 'dddd, MMMM D'
 	}
 };
 
@@ -145,5 +155,3 @@ var rtlDefaults = {
 		prevYear: 'seek-next'
 	}
 };
-
-

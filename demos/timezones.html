@@ -6,7 +6,6 @@
 <link href='../dist/fullcalendar.print.css' rel='stylesheet' media='print' />
 <script src='../lib/moment/moment.js'></script>
 <script src='../lib/jquery/dist/jquery.js'></script>
-<script src='../lib/jquery-ui/jquery-ui.js'></script>
 <script src='../dist/fullcalendar.js'></script>
 <script>
 
@@ -33,14 +32,16 @@
 
 		function renderCalendar() {
 			$('#calendar').fullCalendar({
+				allDaySlot: false,
 				header: {
 					left: 'prev,next today',
 					center: 'title',
 					right: 'month,agendaWeek,agendaDay'
 				},
-				defaultDate: '2014-06-12',
+				defaultDate: '2014-08-12',
 				timezone: currentTimezone,
 				editable: true,
+				eventLimit: true, // allow "more" link when too many events
 				events: {
 					url: 'php/get-events.php',
 					error: function() {
@@ -53,7 +54,7 @@
 				eventRender: function(event, el) {
 					// render the timezone offset below the event title
 					if (event.start.hasZone()) {
-						el.find('.fc-event-title').after(
+						el.find('.fc-title').after(
 							$('<div class="tzo"/>').text(event.start.format('Z'))
 						);
 					}
@@ -89,8 +90,9 @@
 	#script-warning { font-weight: bold; color: red }
 
 	#calendar {
-		width: 900px;
+		max-width: 900px;
 		margin: 40px auto;
+		padding: 0 10px;
 	}
 
 	.tzo {
