@@ -13,106 +13,116 @@ Common interface:
 /* Coordinate map for a grid component
 ----------------------------------------------------------------------------------------------------------------------*/
 
-function GridCoordMap(grid) {
-	this.grid = grid;
-}
-
-
-GridCoordMap.prototype = {
+var GridCoordMap = Class.extend({
 
 	grid: null, // reference to the Grid
-	rows: null, // the top-to-bottom y coordinates. including the bottom of the last item
-	cols: null, // the left-to-right x coordinates. including the right of the last item
+	rowCoords: null, // array of {top,bottom} objects
+	colCoords: null, // array of {left,right} objects
 
 	containerEl: null, // container element that all coordinates are constrained to. optionally assigned
-	minX: null,
-	maxX: null, // exclusive
-	minY: null,
-	maxY: null, // exclusive
+	bounds: null,
+
+
+	constructor: function(grid) {
+		this.grid = grid;
+	},
 
 
 	// Queries the grid for the coordinates of all the cells
 	build: function() {
-		this.grid.buildCoords(
-			this.rows = [],
-			this.cols = []
-		);
+		this.grid.build();
+		this.rowCoords = this.grid.computeRowCoords();
+		this.colCoords = this.grid.computeColCoords();
 		this.computeBounds();
+	},
+
+
+	// Clears the coordinates data to free up memory
+	clear: function() {
+		this.grid.clear();
+		this.rowCoords = null;
+		this.colCoords = null;
 	},
 
 
 	// Given a coordinate of the document, gets the associated cell. If no cell is underneath, returns null
 	getCell: function(x, y) {
-		var cell = null;
-		var rows = this.rows;
-		var cols = this.cols;
-		var r = -1;
-		var c = -1;
-		var i;
+		var rowCoords = this.rowCoords;
+		var rowCnt = rowCoords.length;
+		var colCoords = this.colCoords;
+		var colCnt = colCoords.length;
+		var hitRow = null;
+		var hitCol = null;
+		var i, coords;
+		var cell;
 
 		if (this.inBounds(x, y)) {
 
-			for (i = 0; i < rows.length; i++) {
-				if (y >= rows[i][0] && y < rows[i][1]) {
-					r = i;
+			for (i = 0; i < rowCnt; i++) {
+				coords = rowCoords[i];
+				if (y >= coords.top && y < coords.bottom) {
+					hitRow = i;
 					break;
 				}
 			}
 
-			for (i = 0; i < cols.length; i++) {
-				if (x >= cols[i][0] && x < cols[i][1]) {
-					c = i;
+			for (i = 0; i < colCnt; i++) {
+				coords = colCoords[i];
+				if (x >= coords.left && x < coords.right) {
+					hitCol = i;
 					break;
 				}
 			}
 
-			if (r >= 0 && c >= 0) {
-				cell = { row: r, col: c };
-				cell.grid = this.grid;
-				cell.date = this.grid.getCellDate(cell);
+			if (hitRow !== null && hitCol !== null) {
+
+				cell = this.grid.getCell(hitRow, hitCol); // expected to return a fresh object we can modify
+				cell.grid = this.grid; // for CellDragListener's isCellsEqual. dragging between grids
+
+				// make the coordinates available on the cell object
+				$.extend(cell, rowCoords[hitRow], colCoords[hitCol]);
+
+				return cell;
 			}
 		}
 
-		return cell;
+		return null;
 	},
 
 
 	// If there is a containerEl, compute the bounds into min/max values
 	computeBounds: function() {
-		var containerOffset;
-
-		if (this.containerEl) {
-			containerOffset = this.containerEl.offset();
-			this.minX = containerOffset.left;
-			this.maxX = containerOffset.left + this.containerEl.outerWidth();
-			this.minY = containerOffset.top;
-			this.maxY = containerOffset.top + this.containerEl.outerHeight();
-		}
+		this.bounds = this.containerEl ?
+			getClientRect(this.containerEl) : // area within scrollbars
+			null;
 	},
 
 
 	// Determines if the given coordinates are in bounds. If no `containerEl`, always true
 	inBounds: function(x, y) {
-		if (this.containerEl) {
-			return x >= this.minX && x < this.maxX && y >= this.minY && y < this.maxY;
+		var bounds = this.bounds;
+
+		if (bounds) {
+			return x >= bounds.left && x < bounds.right && y >= bounds.top && y < bounds.bottom;
 		}
+
 		return true;
 	}
 
-};
+});
 
 
 /* Coordinate map that is a combination of multiple other coordinate maps
 ----------------------------------------------------------------------------------------------------------------------*/
 
-function ComboCoordMap(coordMaps) {
-	this.coordMaps = coordMaps;
-}
-
-
-ComboCoordMap.prototype = {
+var ComboCoordMap = Class.extend({
 
 	coordMaps: null, // an array of CoordMaps
+
+
+	constructor: function(coordMaps) {
+		this.coordMaps = coordMaps;
+	},
 
 
 	// Builds all coordMaps
@@ -137,6 +147,17 @@ ComboCoordMap.prototype = {
 		}
 
 		return cell;
+	},
+
+
+	// Clears all coordMaps
+	clear: function() {
+		var coordMaps = this.coordMaps;
+		var i;
+
+		for (i = 0; i < coordMaps.length; i++) {
+			coordMaps[i].clear();
+		}
 	}
 
-};
+});
